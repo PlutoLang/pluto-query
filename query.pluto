@@ -1,0 +1,83 @@
+-- https://github.com/PlutoLang/pluto-query
+
+local xml = require "pluto:xml"
+assert(xml.query == nil)
+
+local parse_selector
+parse_selector = function(str)
+	local end_of_tag = str:find("[#%[ +]")
+	if end_of_tag == nil then
+		if str == "*" then
+			return {}
+		end
+		return { tag = str }
+	end
+	local selector = {}
+	if end_of_tag ~= 1 then
+		local tag = str:sub(1, end_of_tag - 1)
+		if tag ~= "*" then
+			selector.tag = tag
+		end
+	end
+	local i = end_of_tag
+	if str[end_of_tag] == "#" then
+		local end_of_id = str:find("[%[ +]", i)
+		if end_of_id then end_of_id -= 1 end
+		selector.attributes = { id = str:sub(1 + i, end_of_id) }
+		i = end_of_id
+	end
+	if sep := str:find("%+", i) then
+		selector.next_child = parse_selector(str:sub(1 + sep):lstrip())
+	end
+	return selector
+end
+
+local function selector_matches(selector, node)
+	if selector.tag and selector.tag ~= node.tag then
+		return false
+	end
+	if selector.attributes then
+		if not node.attributes then
+			return false
+		end
+		for key, value in selector.attributes do
+			if node.attributes[key] ~= value then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+local selector_query
+selector_query = function(selector, node)
+	if node.children then
+		for i, child in node.children do
+			if selector_matches(selector, child) then
+				if selector.next_child then
+					local next = node.children[i + 1]
+					if next and selector_matches(selector.next_child, next) then
+						return next
+					end
+				else
+					return child
+				end
+			end
+			if res := selector_query(selector, child) then
+				return res
+			end
+		end
+	end
+	return nil
+end
+
+xml.query = function(root, selector)
+	selector = parse_selector(selector)
+	if selector_matches(selector, root) then
+		if selector.next_child then
+			return nil
+		end
+		return root
+	end
+	return selector_query(selector, root)
+end

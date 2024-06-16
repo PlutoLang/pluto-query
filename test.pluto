@@ -1,0 +1,30 @@
+require "query"
+
+local { xml } = require "*"
+
+do
+	local root = xml.decode([[<div>
+		<a href="#header">link to header</a>
+		<h3 id="header">linked header</h3>
+	</div>]], "html")
+	local a = xml.query(root, "a")
+	assert(a)
+	assert(a.tag == "a")
+	assert(a.attributes.href == "#header")
+	local h3 = xml.query(root, "#header")
+	assert(h3)
+	assert(h3.tag == "h3")
+	assert(h3.attributes.id == "header")
+end
+
+do
+	local root = xml.decode([[<div>
+		<h3 id="header">header</h3>
+		<p>element after header</p>
+	</div>]], "html")
+	local p = xml.query(root, "#header + *")
+	assert(p)
+	assert(p.tag == "p")
+end
+
+print "OK!"
